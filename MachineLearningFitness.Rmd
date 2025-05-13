@@ -1,0 +1,69 @@
+---
+title: 'Machine Learning: Fitness Trackers'
+output: html_document
+---
+###Data reading:
+We start by reading the training and testing data
+```{r}
+training=read.csv('pml-training.csv',stringsAsFactors=FALSE)
+testing=read.csv('pml-testing.csv',stringsAsFactors=FALSE)
+
+```
+
+###Data tidying:
+After inspecting our data we keep only the variables of interest. We remove the variables with many NA values, as well as the id,name and timestamp colums. We keep the sensors measurements by using grep and locating the column indexes we want
+```{r}
+(keepVarsIndexes<-grep("gyros|magnet|^accel|^total_accel|^pitch|^yaw|^roll",names(training)))
+```
+We create a subset of the original training data
+```{r}
+tidyData<-training[,keepVarsIndexes]
+tidyData$classe<-as.factor(training$classe)
+```
+
+###Data splitting:
+We split our tidy train data into a mytrain and mytest subset.
+```{r}
+library(caret)
+set.seed(12)
+inTrain <- createDataPartition(tidyData$classe,p=0.75, list=FALSE)
+mytrain <- tidyData[inTrain,]
+mytest  <- tidyData[-inTrain,]
+```
+
+###Cross Validation:
+We will use cross validation to better train our model and avoid underfitting
+```{r}
+set.seed(543)
+# Number of folds
+tr.control = trainControl(method = "cv", number = 10)
+# cp values
+cp.grid = expand.grid( .cp = (0:10)*0.001)
+```
+
+###Model building:
+We choose to use rpart since it can also capture non linear relationships. For training our model we 
+use the mytrain dataset and the number of folds and cp values calculated in the previous step. After having our model we predict on mytest dataset and we ask for the confucion matrix
+
+```{r}
+rpartFit<-train(classe~.,method='rpart',data=mytrain,
+                trControl = tr.control, tuneGrid = cp.grid)
+
+predictRPart<-predict(rpartFit,newdata=mytest)
+confusionMatrix(predictRPart,mytest$classe)
+```
+
+### Out of sample error
+Our model has 93.6% out of sample accuracy on predicting with mytest dataset. 6.4% is the expected out of sample or generalisation error
+
+
+
+```{r}
+```
+
+###Predictions
+We predict the classe outcome for our testing dataset
+```{r}
+finaltesting<-testing[,keepVarsIndexes]
+(predictionsSubmit<-predict(rpartFit,newdata=finaltesting))
+```
